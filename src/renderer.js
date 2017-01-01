@@ -1,30 +1,30 @@
 import Vector from './vector'
 import Ray from './ray'
 
-const defaultScene = {
+const DEFAULT_SCENE = {
   camera: {
     point: new Vector(0.0, 0.0, 0.0),
     fieldOfView: 45,
-    direction: new Vector(0.0, 3.0, 0.0)
+    direction: new Vector(0.0, 0.0, 0.0)
   },
   lights: [],
   objects: []
 }
 
 export default class Renderer {
-  constructor(canvas, scene = defaultScene) {
+  constructor(canvas, generateSceneCallback = () => DEFAULT_SCENE) {
     const { width, height } = this.canvas
 
     this.canvas = canvas
     this.context = canvas.getContext('2d')
     this.data = this.context.getImageData(0, 0, width, height)
-    this.scene = scene
+    this.generateScene = generateSceneCallback
     this.isPlaying = false
     this.startTime = null
   }
 
-  render() {
-    const { camera, lights, objects } = this.scene
+  render(scene) {
+    const { camera, lights, objects } = scene
     const { width, height } = this.canvas
 
     // all the raytracing stuff goes here
@@ -39,8 +39,9 @@ export default class Renderer {
     }
 
     const progress = timestamp - this.startTime
+    const scene = this.generateScene(progress)
 
-    this.render()
+    this.render(scene)
 
     if (this.isPlaying) {
       requestAnimationFrame(this.tick.bind(this))
