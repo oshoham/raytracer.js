@@ -40,7 +40,7 @@ export default class Vector {
   }
 
   static normalize(a) {
-    return Vector.div(a, Vector.mag(a))
+    return Vector.div(a, a.mag())
   }
 
   static add(a, b) {

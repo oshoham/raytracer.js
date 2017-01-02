@@ -66,9 +66,7 @@
 	canvas.height = height;
 	canvas.style.cssText = 'width:' + width * 2 + 'px;height:' + height * 2 + 'px';
 	
-	var renderer = new _renderer2.default(canvas, function (progress) {
-	  progress *= 0.001;
-	
+	function generateScene(progress) {
 	  var scene = {
 	    camera: {
 	      point: new _vector2.default(0.0, 1.8, 10),
@@ -107,9 +105,14 @@
 	  };
 	
 	  return scene;
-	});
+	}
 	
-	renderer.play();
+	var renderer = new _renderer2.default(canvas, generateScene);
+	
+	renderer.tick();
+	
+	document.getElementById('play').onclick = renderer.play.bind(renderer);
+	document.getElementById('stop').onclick = renderer.stop.bind(renderer);
 
 /***/ },
 /* 1 */
@@ -307,7 +310,7 @@
 	  }, {
 	    key: "normalize",
 	    value: function normalize(a) {
-	      return Vector.div(a, Vector.mag(a));
+	      return Vector.div(a, a.mag());
 	    }
 	  }, {
 	    key: "add",
@@ -542,7 +545,7 @@
 	    this.generateScene = generateSceneCallback;
 	    this.traceDepthLimit = DEFAULT_TRACE_DEPTH_LIMIT;
 	    this.isPlaying = false;
-	    this.startTime = null;
+	    this.time = 1;
 	  }
 	
 	  _createClass(Renderer, [{
@@ -659,7 +662,7 @@
 	        var reflectedRay = new _ray2.default(pointAtTime, _vector2.default.reflectThrough(ray.direction, normal));
 	        var reflectedColor = this.trace(reflectedRay, scene, depth + 1);
 	        if (reflectedColor) {
-	          color = _vector2.default.add(color, _vector2.default.mult(reflectedColor, object.material.specular));
+	          color.add(_vector2.default.mult(reflectedColor, object.material.specular));
 	        }
 	      }
 	
@@ -670,7 +673,9 @@
 	      // Ambient colors shine bright regardless of whether there's a light visible -
 	      // a circle with a totally ambient blue color will always just be a flat blue
 	      // circle.
-	      return _vector2.default.add(_vector2.default.add(color, _vector2.default.mult(object.color, lambertAmount * object.material.lambert)), _vector2.default.mult(object.color, object.material.ambient));
+	      color.add(_vector2.default.mult(object.color, lambertAmount * object.material.lambert));
+	      color.add(_vector2.default.mult(object.color, object.material.ambient));
+	      return color;
 	    }
 	  }, {
 	    key: 'isLightVisible',
@@ -683,13 +688,9 @@
 	    }
 	  }, {
 	    key: 'tick',
-	    value: function tick(timestamp) {
-	      if (!this.startTime) {
-	        this.startTime = timestamp;
-	      }
-	
-	      var progress = timestamp - this.startTime;
-	      var scene = this.generateScene(progress);
+	    value: function tick() {
+	      var scene = this.generateScene(this.time);
+	      this.time++;
 	
 	      this.render(scene);
 	

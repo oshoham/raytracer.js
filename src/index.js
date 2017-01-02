@@ -10,9 +10,7 @@ canvas.width = width
 canvas.height = height
 canvas.style.cssText = `width:${(width * 2)}px;height:${(height * 2)}px`
 
-const renderer = new Renderer(canvas, function (progress) {
-  progress *= 0.001
-
+function generateScene(progress) {
   const scene = {
     camera: {
       point: new Vector(0.0, 1.8, 10),
@@ -55,6 +53,11 @@ const renderer = new Renderer(canvas, function (progress) {
   }
 
   return scene
-})
+}
 
-renderer.play()
+const renderer = new Renderer(canvas, generateScene)
+
+renderer.tick()
+
+document.getElementById('play').onclick = renderer.play.bind(renderer)
+document.getElementById('stop').onclick = renderer.stop.bind(renderer)

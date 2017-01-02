@@ -22,7 +22,7 @@ export default class Renderer {
     this.generateScene = generateSceneCallback
     this.traceDepthLimit = DEFAULT_TRACE_DEPTH_LIMIT
     this.isPlaying = false
-    this.startTime = null
+    this.time = 1
   }
 
   render(scene) {
@@ -127,7 +127,7 @@ export default class Renderer {
       const reflectedRay = new Ray(pointAtTime, Vector.reflectThrough(ray.direction, normal))
       const reflectedColor = this.trace(reflectedRay, scene, depth + 1)
       if (reflectedColor) {
-        color = Vector.add(color, Vector.mult(reflectedColor, object.material.specular))
+        color.add(Vector.mult(reflectedColor, object.material.specular))
       }
     }
 
@@ -138,13 +138,9 @@ export default class Renderer {
     // Ambient colors shine bright regardless of whether there's a light visible -
     // a circle with a totally ambient blue color will always just be a flat blue
     // circle.
-    return Vector.add(
-      Vector.add(
-        color,
-        Vector.mult(object.color, lambertAmount * object.material.lambert)
-      ),
-      Vector.mult(object.color, object.material.ambient)
-    )
+    color.add(Vector.mult(object.color, lambertAmount * object.material.lambert))
+    color.add(Vector.mult(object.color, object.material.ambient))
+    return color
   }
 
   isLightVisible(point, scene, light) {
@@ -152,13 +148,9 @@ export default class Renderer {
     return dist > -0.005
   }
 
-  tick(timestamp) {
-    if (!this.startTime) {
-      this.startTime = timestamp
-    }
-
-    const progress = timestamp - this.startTime
-    const scene = this.generateScene(progress)
+  tick() {
+    const scene = this.generateScene(this.time)
+    this.time++
 
     this.render(scene)
 
