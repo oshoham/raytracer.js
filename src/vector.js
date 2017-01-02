@@ -11,6 +11,14 @@ export default class Vector {
     this.z = z
   }
 
+  static get UP() {
+    return new Vector(0.0, 1.0, 0.0)
+  }
+
+  static get ZERO() {
+    return new Vector(0.0, 0.0, 0.0)
+  }
+
   static dot(a, b) {
     return a.dot(b)
   }
@@ -28,7 +36,7 @@ export default class Vector {
   }
 
   static mag(a) {
-    return Math.sqrt(Vector.dot(a, a))
+    return a.mag()
   }
 
   static normalize(a) {
@@ -44,7 +52,7 @@ export default class Vector {
   }
 
   static dist(a, b) {
-    a.dist(b)
+    return a.dist(b)
   }
 
   static lerp(a, b, amount) {
@@ -53,6 +61,11 @@ export default class Vector {
 
   static angleBetween(a, b) {
     return Math.acos(a.dot(b) / (a.mag() * b.mag())) // in radians
+  }
+
+  static reflectThrough(a, normal) {
+    const d = Vector.mult(normal, Vector.dot(a, normal))
+    return Vector.sub(Vector.mult(d, 2), a)
   }
 
   copy() {
@@ -79,9 +92,9 @@ export default class Vector {
 
   cross(v) {
     return new Vector(
-      (this.y * v.z) - (this.z * this.y),
-      (this.z * v.x) - (this.x * this.z),
-      (this.x * v.y) - (this.y * this.x)
+      (this.y * v.z) - (this.z * v.y),
+      (this.z * v.x) - (this.x * v.z),
+      (this.x * v.y) - (this.y * v.x)
     )
   }
 

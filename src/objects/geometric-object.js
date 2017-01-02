@@ -3,4 +3,12 @@ export default class GeometricObject {
     this.color = color
     this.material = material
   }
+
+  calculateIntersection() {
+    return undefined
+  }
+
+  calculateNormal() {
+    return undefined
+  }
 }
