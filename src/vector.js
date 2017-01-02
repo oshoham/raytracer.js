@@ -19,6 +19,10 @@ export default class Vector {
     return new Vector(0.0, 0.0, 0.0)
   }
 
+  static get WHITE() {
+    return new Vector(255, 255, 255)
+  }
+
   static dot(a, b) {
     return a.dot(b)
   }

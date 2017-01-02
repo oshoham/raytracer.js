@@ -107,7 +107,7 @@
 	  return scene;
 	}
 	
-	var renderer = new _renderer2.default(canvas, generateScene);
+	var renderer = new _renderer2.default(canvas, generateScene, { enableSampling: true });
 	
 	renderer.tick();
 	
@@ -353,6 +353,11 @@
 	    get: function get() {
 	      return new Vector(0.0, 0.0, 0.0);
 	    }
+	  }, {
+	    key: "WHITE",
+	    get: function get() {
+	      return new Vector(255, 255, 255);
+	    }
 	  }]);
 	
 	  return Vector;
@@ -516,22 +521,17 @@
 	
 	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 	
-	var DEFAULT_TRACE_DEPTH_LIMIT = 3;
-	var DEFAULT_SCENE = {
-	  camera: {
-	    point: new _vector2.default(0.0, 0.0, 0.0),
-	    fieldOfView: 45,
-	    direction: new _vector2.default(0.0, 0.0, 0.0)
-	  },
-	  lights: [],
-	  objects: []
-	};
-	
 	var Renderer = function () {
-	  function Renderer(canvas) {
-	    var generateSceneCallback = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : function () {
-	      return DEFAULT_SCENE;
-	    };
+	  function Renderer(canvas, generateSceneCallback) {
+	    var _ref = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {},
+	        _ref$traceDepthLimit = _ref.traceDepthLimit,
+	        traceDepthLimit = _ref$traceDepthLimit === undefined ? 3 : _ref$traceDepthLimit,
+	        _ref$enableSampling = _ref.enableSampling,
+	        enableSampling = _ref$enableSampling === undefined ? false : _ref$enableSampling,
+	        _ref$numSamples = _ref.numSamples,
+	        numSamples = _ref$numSamples === undefined ? 9 : _ref$numSamples,
+	        _ref$samplingMethod = _ref.samplingMethod,
+	        samplingMethod = _ref$samplingMethod === undefined ? 'jitter' : _ref$samplingMethod;
 	
 	    _classCallCheck(this, Renderer);
 	
@@ -543,7 +543,9 @@
 	    this.context = canvas.getContext('2d');
 	    this.data = this.context.getImageData(0, 0, width, height);
 	    this.generateScene = generateSceneCallback;
-	    this.traceDepthLimit = DEFAULT_TRACE_DEPTH_LIMIT;
+	    this.traceDepthLimit = traceDepthLimit;
+	    this.enableSampling = enableSampling;
+	    this.numSamples = numSamples;
 	    this.isPlaying = false;
 	    this.time = 1;
 	  }
@@ -556,11 +558,13 @@
 	          width = _canvas.width,
 	          height = _canvas.height;
 	
+	      var data = this.data;
+	
 	      // all the raytracing stuff goes here
 	
-	      var eyeVector = _vector2.default.normalize(_vector2.default.sub(camera.direction, camera.point));
-	      var vpRight = _vector2.default.normalize(_vector2.default.cross(eyeVector, _vector2.default.UP));
-	      var vpUp = _vector2.default.normalize(_vector2.default.cross(vpRight, eyeVector));
+	      var eyeVector = _vector2.default.sub(camera.direction, camera.point).normalize(); // w (reversed?)
+	      var vpRight = _vector2.default.cross(eyeVector, _vector2.default.UP).normalize(); // u
+	      var vpUp = _vector2.default.cross(vpRight, eyeVector).normalize(); // v
 	
 	      var fovRadians = Math.PI * (camera.fieldOfView / 2) / 180;
 	      var heightWidthRatio = height / width;
@@ -572,27 +576,51 @@
 	      var pixelHeight = cameraHeight / (height - 1);
 	
 	      var ray = new _ray2.default(camera.point);
+	
 	      for (var x = 0; x < width; x++) {
 	        for (var y = 0; y < height; y++) {
-	          // turn the raw pixel x and y values into values from -1 to 1
-	          // and use these values to scale the facing-right and facing-up
-	          // vectors so that we generate versions of the `eyeVector` that are
-	          // skewed in each necessary direction.
-	          var xComp = _vector2.default.mult(vpRight, x * pixelWidth - halfWidth);
-	          var yComp = _vector2.default.mult(vpUp, y * pixelHeight - halfHeight);
+	          var color = _vector2.default.ZERO;
 	
-	          ray.direction = _vector2.default.normalize(_vector2.default.add(eyeVector, _vector2.default.add(xComp, yComp)));
+	          if (this.enableSampling) {
+	            var n = Math.sqrt(this.numSamples);
 	
-	          var color = this.trace(ray, scene, 0);
+	            for (var p = 0; p < n; p++) {
+	              for (var q = 0; q < n; q++) {
+	                // turn the raw pixel x and y values into values from -1 to 1
+	                // and use these values to scale the facing-right and facing-up
+	                // vectors so that we generate versions of the `eyeVector` that are
+	                // skewed in each necessary direction.
+	                var xv = pixelWidth * (x - halfWidth + (q + Math.random()) / n) - halfWidth;
+	                var yv = pixelHeight * (y - halfHeight + (p + Math.random()) / n) - halfHeight;
+	                var xComp = _vector2.default.mult(vpRight, xv);
+	                var yComp = _vector2.default.mult(vpUp, yv);
+	
+	                ray.direction = _vector2.default.add(xComp, yComp).add(eyeVector).normalize();
+	
+	                color.add(this.trace(ray, scene, 0));
+	              }
+	            }
+	
+	            color.div(this.numSamples);
+	          } else {
+	            var _xv = pixelWidth * (x - halfWidth) - halfWidth;
+	            var _yv = pixelHeight * (y - halfHeight) - halfHeight;
+	            var _xComp = _vector2.default.mult(vpRight, _xv);
+	            var _yComp = _vector2.default.mult(vpUp, _yv);
+	
+	            ray.direction = _vector2.default.add(_xComp, _yComp).add(eyeVector).normalize();
+	            color.set(this.trace(ray, scene, 0));
+	          }
+	
 	          var index = x * 4 + y * width * 4;
-	          this.data.data[index + 0] = color.x;
-	          this.data.data[index + 1] = color.y;
-	          this.data.data[index + 2] = color.z;
-	          this.data.data[index + 3] = 255;
+	          data.data[index + 0] = color.x;
+	          data.data[index + 1] = color.y;
+	          data.data[index + 2] = color.z;
+	          data.data[index + 3] = 255;
 	        }
 	      }
 	
-	      this.context.putImageData(this.data, 0, 0);
+	      this.context.putImageData(data, 0, 0);
 	    }
 	  }, {
 	    key: 'trace',
@@ -607,7 +635,7 @@
 	          object = _intersectScene2[1];
 	
 	      if (dist === Infinity) {
-	        return new _vector2.default(255, 255, 255);
+	        return _vector2.default.WHITE;
 	      }
 	
 	      // The pointAtTime is another way of saying the 'intersection point'
@@ -645,7 +673,7 @@
 	          // essentially is a 'diffuse' lighting system - direct light
 	          // is bright, and from there, less direct light is gradually,
 	          // beautifully, less light.
-	          var contribution = _vector2.default.dot(_vector2.default.normalize(_vector2.default.sub(lightPoint, pointAtTime)), normal);
+	          var contribution = _vector2.default.dot(_vector2.default.sub(lightPoint, pointAtTime).normalize(), normal);
 	          // sometimes this formula can return negatives, so we check:
 	          // we only want positive values for lighting.
 	          if (contribution > 0) {
@@ -680,7 +708,7 @@
 	  }, {
 	    key: 'isLightVisible',
 	    value: function isLightVisible(point, scene, light) {
-	      var _intersectScene3 = this.intersectScene(new _ray2.default(point, _vector2.default.normalize(_vector2.default.sub(point, light))), scene),
+	      var _intersectScene3 = this.intersectScene(new _ray2.default(point, _vector2.default.sub(point, light).normalize()), scene),
 	          _intersectScene4 = _slicedToArray(_intersectScene3, 1),
 	          dist = _intersectScene4[0];
 	
@@ -701,6 +729,9 @@
 	  }, {
 	    key: 'play',
 	    value: function play() {
+	      if (this.isPlaying) {
+	        return;
+	      }
 	      this.isPlaying = true;
 	      requestAnimationFrame(this.tick.bind(this));
 	    }

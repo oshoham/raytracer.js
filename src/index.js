@@ -55,7 +55,7 @@ function generateScene(progress) {
   return scene
 }
 
-const renderer = new Renderer(canvas, generateScene)
+const renderer = new Renderer(canvas, generateScene, { enableSampling: true })
 
 renderer.tick()
 

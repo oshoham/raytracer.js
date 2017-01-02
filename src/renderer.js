@@ -1,26 +1,17 @@
 import Vector from './vector'
 import Ray from './ray'
 
-const DEFAULT_TRACE_DEPTH_LIMIT = 3
-const DEFAULT_SCENE = {
-  camera: {
-    point: new Vector(0.0, 0.0, 0.0),
-    fieldOfView: 45,
-    direction: new Vector(0.0, 0.0, 0.0)
-  },
-  lights: [],
-  objects: []
-}
-
 export default class Renderer {
-  constructor(canvas, generateSceneCallback = () => DEFAULT_SCENE) {
+  constructor(canvas, generateSceneCallback, { traceDepthLimit=3, enableSampling=false, numSamples=9, samplingMethod='jitter' } = {}) {
     const { width, height } = canvas
 
     this.canvas = canvas
     this.context = canvas.getContext('2d')
     this.data = this.context.getImageData(0, 0, width, height)
     this.generateScene = generateSceneCallback
-    this.traceDepthLimit = DEFAULT_TRACE_DEPTH_LIMIT
+    this.traceDepthLimit = traceDepthLimit
+    this.enableSampling = enableSampling
+    this.numSamples = numSamples
     this.isPlaying = false
     this.time = 1
   }
@@ -28,12 +19,13 @@ export default class Renderer {
   render(scene) {
     const camera = scene.camera
     const { width, height } = this.canvas
+    const data = this.data
 
     // all the raytracing stuff goes here
 
-    const eyeVector = Vector.normalize(Vector.sub(camera.direction, camera.point))
-    const vpRight = Vector.normalize(Vector.cross(eyeVector, Vector.UP))
-    const vpUp = Vector.normalize(Vector.cross(vpRight, eyeVector))
+    const eyeVector = Vector.sub(camera.direction, camera.point).normalize() // w (reversed?)
+    const vpRight = Vector.cross(eyeVector, Vector.UP).normalize() // u
+    const vpUp = Vector.cross(vpRight, eyeVector).normalize() // v
 
     const fovRadians = Math.PI * (camera.fieldOfView / 2) / 180
     const heightWidthRatio = height / width
@@ -45,27 +37,51 @@ export default class Renderer {
     const pixelHeight = cameraHeight / (height - 1)
 
     const ray = new Ray(camera.point)
+
     for (let x = 0; x < width; x++) {
       for (let y = 0; y < height; y++) {
-        // turn the raw pixel x and y values into values from -1 to 1
-        // and use these values to scale the facing-right and facing-up
-        // vectors so that we generate versions of the `eyeVector` that are
-        // skewed in each necessary direction.
-        const xComp = Vector.mult(vpRight, (x * pixelWidth) - halfWidth)
-        const yComp = Vector.mult(vpUp, (y * pixelHeight) - halfHeight)
+        const color = Vector.ZERO
 
-        ray.direction = Vector.normalize(Vector.add(eyeVector, Vector.add(xComp, yComp)))
+        if (this.enableSampling) {
+          const n = Math.sqrt(this.numSamples)
 
-        const color = this.trace(ray, scene, 0)
+          for (let p = 0; p < n; p++) {
+            for (let q = 0; q < n; q++) {
+              // turn the raw pixel x and y values into values from -1 to 1
+              // and use these values to scale the facing-right and facing-up
+              // vectors so that we generate versions of the `eyeVector` that are
+              // skewed in each necessary direction.
+              const xv = pixelWidth * (x - halfWidth + (q + Math.random()) / n) - halfWidth
+              const yv = pixelHeight * (y - halfHeight + (p + Math.random()) / n) - halfHeight
+              const xComp = Vector.mult(vpRight, xv)
+              const yComp = Vector.mult(vpUp, yv)
+
+              ray.direction = Vector.add(xComp, yComp).add(eyeVector).normalize()
+
+              color.add(this.trace(ray, scene, 0))
+            }
+          }
+
+          color.div(this.numSamples)
+        } else {
+          const xv = pixelWidth * (x - halfWidth) - halfWidth
+          const yv = pixelHeight * (y - halfHeight) - halfHeight
+          const xComp = Vector.mult(vpRight, xv)
+          const yComp = Vector.mult(vpUp, yv)
+
+          ray.direction = Vector.add(xComp, yComp).add(eyeVector).normalize()
+          color.set(this.trace(ray, scene, 0))
+        }
+
         const index = (x * 4) + (y * width * 4)
-        this.data.data[index + 0] = color.x
-        this.data.data[index + 1] = color.y
-        this.data.data[index + 2] = color.z
-        this.data.data[index + 3] = 255
+        data.data[index + 0] = color.x
+        data.data[index + 1] = color.y
+        data.data[index + 2] = color.z
+        data.data[index + 3] = 255
       }
     }
 
-    this.context.putImageData(this.data, 0, 0)
+    this.context.putImageData(data, 0, 0)
   }
 
   trace(ray, scene, depth) {
@@ -76,7 +92,7 @@ export default class Renderer {
     const [dist, object] = this.intersectScene(ray, scene)
 
     if (dist === Infinity) {
-      return new Vector(255, 255, 255)
+      return Vector.WHITE
     }
 
     // The pointAtTime is another way of saying the 'intersection point'
@@ -89,7 +105,7 @@ export default class Renderer {
   }
 
   intersectScene(ray, scene) {
-    return scene.objects.reduce(function (closest, object) {
+    return scene.objects.reduce(function(closest, object) {
       const dist = object.calculateIntersection(ray)
       return dist !== undefined && dist < closest[0] ? [dist, object] : closest
     }, [Infinity, null])
@@ -110,7 +126,7 @@ export default class Renderer {
         // essentially is a 'diffuse' lighting system - direct light
         // is bright, and from there, less direct light is gradually,
         // beautifully, less light.
-        const contribution = Vector.dot(Vector.normalize(Vector.sub(lightPoint, pointAtTime)), normal)
+        const contribution = Vector.dot(Vector.sub(lightPoint, pointAtTime).normalize(), normal)
         // sometimes this formula can return negatives, so we check:
         // we only want positive values for lighting.
         if (contribution > 0) {
@@ -144,7 +160,7 @@ export default class Renderer {
   }
 
   isLightVisible(point, scene, light) {
-    const [dist] = this.intersectScene(new Ray(point, Vector.normalize(Vector.sub(point, light))), scene)
+    const [dist] = this.intersectScene(new Ray(point, Vector.sub(point, light).normalize()), scene)
     return dist > -0.005
   }
 
@@ -160,6 +176,9 @@ export default class Renderer {
   }
 
   play() {
+    if (this.isPlaying) {
+      return
+    }
     this.isPlaying = true
     requestAnimationFrame(this.tick.bind(this))
   }
