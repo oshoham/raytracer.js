@@ -1,4 +1,4 @@
-import Vector from './vector-objects'
+import Vector from './vector'
 import { Sphere } from './objects'
 import Renderer from './renderer'
 
@@ -55,7 +55,7 @@ function generateScene(progress) {
   return scene
 }
 
-const renderer = new Renderer(canvas, generateScene)
+const renderer = new Renderer(canvas, generateScene, { enableSampling: false })
 
 renderer.tick()
 

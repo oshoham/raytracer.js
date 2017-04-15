@@ -4,7 +4,8 @@
   "description": "",
   "main": "dist/bundle.js",
   "scripts": {
-    "webpack": "webpack -p --watch"
+    "start": "webpack -p --watch",
+    "build": "webpack -p"
   },
   "author": "",
   "license": "ISC",

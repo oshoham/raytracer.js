@@ -1,5 +1,5 @@
 import GeometricObject from './geometric-object'
-import Vector from '../vector-objects'
+import Vector from '../vector'
 
 export default class Sphere extends GeometricObject {
   constructor({ center, radius, color, material }) {

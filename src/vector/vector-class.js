@@ -23,6 +23,14 @@ export default class Vector {
     return new Vector(255, 255, 255)
   }
 
+  static new(x = 0, y = 0, z = 0) {
+    return new Vector(x, y, z)
+  }
+
+  static copy(v) {
+    return v.copy()
+  }
+
   static dot(a, b) {
     return a.dot(b)
   }
@@ -49,6 +57,10 @@ export default class Vector {
 
   static add(a, b) {
     return a.copy().add(b)
+  }
+
+  static add3(a, b, c) {
+    return a.copy().add(b).add(c)
   }
 
   static sub(a, b) {

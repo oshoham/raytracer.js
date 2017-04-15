@@ -1,4 +1,4 @@
-import Vector from './vector-objects'
+import Vector from './vector'
 
 export default class Renderer {
   constructor(canvas, generateSceneCallback, { traceDepthLimit=3, enableSampling=false, numSamples=9 } = {}) {
