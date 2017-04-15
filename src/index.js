@@ -1,4 +1,4 @@
-import Vector from './vector'
+import Vector from './vector-objects'
 import { Sphere } from './objects'
 import Renderer from './renderer'
 
@@ -13,16 +13,16 @@ canvas.style.cssText = `width:${(width * 2)}px;height:${(height * 2)}px`
 function generateScene(progress) {
   const scene = {
     camera: {
-      point: new Vector(0.0, 1.8, 10),
+      point: Vector.new(0.0, 1.8, 10),
       fieldOfView: 45,
-      direction: new Vector(0.0, 3.0, 0.0)
+      direction: Vector.new(0.0, 3.0, 0.0)
     },
-    lights: [new Vector(-30, -10, 20)],
+    lights: [Vector.new(-30, -10, 20)],
     objects: [
       new Sphere({
-        center: new Vector(0, 3.5, -3),
+        center: Vector.new(0, 3.5, -3),
         radius: 3,
-        color: new Vector(155, 200, 155),
+        color: Vector.new(155, 200, 155),
         material: {
           specular: 0.2,
           lambert: 0.7,
@@ -30,9 +30,9 @@ function generateScene(progress) {
         }
       }),
       new Sphere({
-        center: new Vector(Math.sin(progress * 0.1) * 3.5, 2, -3 + (Math.cos(progress * 0.1) * 3.5)),
+        center: Vector.new(Math.sin(progress * 0.1) * 3.5, 2, -3 + (Math.cos(progress * 0.1) * 3.5)),
         radius: 0.2,
-        color: new Vector(155, 155, 155),
+        color: Vector.new(155, 155, 155),
         material: {
           specular: 0.1,
           lambert: 0.9,
@@ -40,9 +40,9 @@ function generateScene(progress) {
         }
       }),
       new Sphere({
-        center: new Vector(Math.sin(progress * 0.2) * 4, 3, -3 + (Math.cos(progress * 0.2) * 4)),
+        center: Vector.new(Math.sin(progress * 0.2) * 4, 3, -3 + (Math.cos(progress * 0.2) * 4)),
         radius: 0.1,
-        color: new Vector(255, 255, 255),
+        color: Vector.new(255, 255, 255),
         material: {
           specular: 0.2,
           lambert: 0.7,
@@ -55,7 +55,7 @@ function generateScene(progress) {
   return scene
 }
 
-const renderer = new Renderer(canvas, generateScene, { enableSampling: true })
+const renderer = new Renderer(canvas, generateScene)
 
 renderer.tick()
 

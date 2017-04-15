@@ -1,8 +1,7 @@
-import Vector from './vector'
-import Ray from './ray'
+import Vector from './vector-objects'
 
 export default class Renderer {
-  constructor(canvas, generateSceneCallback, { traceDepthLimit=3, enableSampling=false, numSamples=9, samplingMethod='jitter' } = {}) {
+  constructor(canvas, generateSceneCallback, { traceDepthLimit=3, enableSampling=false, numSamples=9 } = {}) {
     const { width, height } = canvas
 
     this.canvas = canvas
@@ -23,9 +22,9 @@ export default class Renderer {
 
     // all the raytracing stuff goes here
 
-    const eyeVector = Vector.sub(camera.direction, camera.point).normalize() // w (reversed?)
-    const vpRight = Vector.cross(eyeVector, Vector.UP).normalize() // u
-    const vpUp = Vector.cross(vpRight, eyeVector).normalize() // v
+    const eyeVector = Vector.normalize(Vector.sub(camera.direction, camera.point)) // w (reversed?)
+    const vpRight = Vector.normalize(Vector.cross(eyeVector, Vector.UP)) // u
+    const vpUp = Vector.normalize(Vector.cross(vpRight, eyeVector)) // v
 
     const fovRadians = Math.PI * (camera.fieldOfView / 2) / 180
     const heightWidthRatio = height / width
@@ -36,11 +35,11 @@ export default class Renderer {
     const pixelWidth = cameraWidth / (width - 1)
     const pixelHeight = cameraHeight / (height - 1)
 
-    const ray = new Ray(camera.point)
+    const ray = { origin: camera.point, direction: Vector.new() }
 
     for (let x = 0; x < width; x++) {
       for (let y = 0; y < height; y++) {
-        const color = Vector.ZERO
+        let color = Vector.copy(Vector.ZERO)
 
         if (this.enableSampling) {
           const n = Math.sqrt(this.numSamples)
@@ -56,21 +55,22 @@ export default class Renderer {
               const xComp = Vector.mult(vpRight, xv)
               const yComp = Vector.mult(vpUp, yv)
 
-              ray.direction = Vector.add(xComp, yComp).add(eyeVector).normalize()
+              ray.direction = Vector.normalize(Vector.add3(xComp, yComp, eyeVector))
 
-              color.add(this.trace(ray, scene, 0))
+              color = Vector.add(color, this.trace(ray, scene, 0))
             }
           }
 
-          color.div(this.numSamples)
+          color = Vector.div(color, this.numSamples)
+
         } else {
           const xv = pixelWidth * (x - halfWidth) - halfWidth
           const yv = pixelHeight * (y - halfHeight) - halfHeight
           const xComp = Vector.mult(vpRight, xv)
           const yComp = Vector.mult(vpUp, yv)
 
-          ray.direction = Vector.add(xComp, yComp).add(eyeVector).normalize()
-          color.set(this.trace(ray, scene, 0))
+          ray.direction = Vector.normalize(Vector.add3(xComp, yComp, eyeVector))
+          color = this.trace(ray, scene, 0)
         }
 
         const index = (x * 4) + (y * width * 4)
@@ -92,14 +92,14 @@ export default class Renderer {
     const [dist, object] = this.intersectScene(ray, scene)
 
     if (dist === Infinity) {
-      return Vector.WHITE
+      return Vector.copy(Vector.WHITE)
     }
 
     // The pointAtTime is another way of saying the 'intersection point'
     // of this ray into this object. We compute this by simply taking
     // the direction of the ray and making it as long as the distance
     // returned by the intersection check.
-    const pointAtTime = Vector.add(ray.origin, Vector.mult(ray.direction, dist))
+    const pointAtTime = Vector.add(Vector.mult(ray.direction, dist), ray.origin)
 
     return this.surface(ray, scene, object, pointAtTime, object.calculateNormal(pointAtTime), depth)
   }
@@ -112,27 +112,29 @@ export default class Renderer {
   }
 
   surface(ray, scene, object, pointAtTime, normal, depth) {
-    let color = Vector.ZERO
+    let color = Vector.copy(Vector.ZERO)
     let lambertAmount = 0
 
     if (object.material.lambert) {
-      scene.lights.forEach(lightPoint => {
+      for (let i = 0; i < scene.lights.length; i++) {
+        const lightPoint = scene.lights[i]
+
         // First: can we see the light? If not, this is a shadowy area
         // and it gets no light from the lambert shading process.
         if (!this.isLightVisible(pointAtTime, scene, lightPoint)) {
-          return
+          continue
         }
         // Otherwise, calculate the lambertian reflectance, which
         // essentially is a 'diffuse' lighting system - direct light
         // is bright, and from there, less direct light is gradually,
         // beautifully, less light.
-        const contribution = Vector.dot(Vector.sub(lightPoint, pointAtTime).normalize(), normal)
+        const contribution = Vector.dot(Vector.normalize(Vector.sub(lightPoint, pointAtTime)), normal)
         // sometimes this formula can return negatives, so we check:
         // we only want positive values for lighting.
         if (contribution > 0) {
           lambertAmount += contribution
         }
-      })
+      }
     }
 
     if (object.material.specular) {
@@ -140,10 +142,10 @@ export default class Renderer {
       // instead of looking from the viewpoint of the camera, we're looking
       // from a point on the surface of a shiny object, seeing what it sees
       // and making that part of a reflection.
-      const reflectedRay = new Ray(pointAtTime, Vector.reflectThrough(ray.direction, normal))
+      const reflectedRay = { origin: pointAtTime, direction: Vector.reflectThrough(ray.direction, normal) }
       const reflectedColor = this.trace(reflectedRay, scene, depth + 1)
       if (reflectedColor) {
-        color.add(Vector.mult(reflectedColor, object.material.specular))
+        color = Vector.add(color, Vector.mult(reflectedColor, object.material.specular))
       }
     }
 
@@ -154,13 +156,14 @@ export default class Renderer {
     // Ambient colors shine bright regardless of whether there's a light visible -
     // a circle with a totally ambient blue color will always just be a flat blue
     // circle.
-    color.add(Vector.mult(object.color, lambertAmount * object.material.lambert))
-    color.add(Vector.mult(object.color, object.material.ambient))
+    color = Vector.add(color, Vector.mult(object.color, lambertAmount * object.material.lambert))
+    color = Vector.add(color, Vector.mult(object.color, object.material.ambient))
     return color
   }
 
   isLightVisible(point, scene, light) {
-    const [dist] = this.intersectScene(new Ray(point, Vector.sub(point, light).normalize()), scene)
+    const ray = { origin: point, direction: Vector.normalize(Vector.sub(point, light)) }
+    const [dist] = this.intersectScene(ray, scene)
     return dist > -0.005
   }
 
