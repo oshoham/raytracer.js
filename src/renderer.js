@@ -1,4 +1,5 @@
 import Vector from './vector'
+import { calculateIntersection, calculateNormal } from './objects'
 
 export default class Renderer {
   constructor(canvas, generateSceneCallback, { traceDepthLimit=3, enableSampling=false, numSamples=9 } = {}) {
@@ -101,12 +102,12 @@ export default class Renderer {
     // returned by the intersection check.
     const pointAtTime = Vector.add(Vector.mult(ray.direction, dist), ray.origin)
 
-    return this.surface(ray, scene, object, pointAtTime, object.calculateNormal(pointAtTime), depth)
+    return this.surface(ray, scene, object, pointAtTime, calculateNormal(object, pointAtTime), depth)
   }
 
   intersectScene(ray, scene) {
     return scene.objects.reduce(function(closest, object) {
-      const dist = object.calculateIntersection(ray)
+      const dist = calculateIntersection(object, ray)
       return dist !== undefined && dist < closest[0] ? [dist, object] : closest
     }, [Infinity, null])
   }
